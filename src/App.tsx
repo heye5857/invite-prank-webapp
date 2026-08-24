@@ -2,13 +2,18 @@
  * Hash-based routing (no router lib).
  *   #p=<payload> -> InvitePage (shared invite view)
  *   anything else -> EditorPage
- * Delegates (T6/T7) replace the placeholder bodies; keep the dispatch contract.
+ * The route re-evaluates on `hashchange` so pasting a fresh invite link
+ * into the same tab switches views without a manual reload.
  */
+import { useEffect, useState } from 'react';
 import InvitePage from './pages/InvitePage';
+import EditorPage from './pages/EditorPage';
 
 const INVITE_PREFIX = '#p=';
 
-export function parseRoute(hash: string): { kind: 'invite'; payload: string } | { kind: 'editor' } {
+export type Route = { kind: 'invite'; payload: string } | { kind: 'editor' };
+
+export function parseRoute(hash: string): Route {
   if (hash.startsWith(INVITE_PREFIX)) {
     return { kind: 'invite', payload: hash.slice(INVITE_PREFIX.length) };
   }
@@ -16,10 +21,16 @@ export function parseRoute(hash: string): { kind: 'invite'; payload: string } | 
 }
 
 export default function App() {
-  const route = parseRoute(window.location.hash);
+  const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash));
+
+  useEffect(() => {
+    const onHashChange = (): void => setRoute(parseRoute(window.location.hash));
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
   if (route.kind === 'invite') {
     return <InvitePage payload={route.payload} />;
   }
-  // TODO(T7): return <EditorPage />
-  return <main data-testid="editor-placeholder" className="p-8">editor placeholder</main>;
+  return <EditorPage />;
 }

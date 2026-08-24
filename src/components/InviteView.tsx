@@ -37,9 +37,11 @@ const BTN_BASE =
 export interface InviteViewProps {
   config: InviteConfig;
   notifier?: Notifier;
+  /** Overrides the root data-testid so the editor preview can be scoped in tests. */
+  rootTestId?: string;
 }
 
-export function InviteView({ config, notifier }: InviteViewProps) {
+export function InviteView({ config, notifier, rootTestId = 'invite-root' }: InviteViewProps) {
   const [screen, setScreen] = useState<Screen>('intro');
   const [gag, setGag] = useState<GagState>(createInitialGagState);
   const [disagreeStep, setDisagreeStep] = useState(0);
@@ -182,7 +184,7 @@ export function InviteView({ config, notifier }: InviteViewProps) {
 
   return (
     <div
-      data-testid="invite-root"
+      data-testid={rootTestId}
       style={rootStyle}
       className="relative mx-auto min-h-dvh max-w-md overflow-hidden px-6"
     >
