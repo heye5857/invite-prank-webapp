@@ -4,6 +4,8 @@
  *   anything else -> EditorPage
  * Delegates (T6/T7) replace the placeholder bodies; keep the dispatch contract.
  */
+import InvitePage from './pages/InvitePage';
+
 const INVITE_PREFIX = '#p=';
 
 export function parseRoute(hash: string): { kind: 'invite'; payload: string } | { kind: 'editor' } {
@@ -16,9 +18,8 @@ export function parseRoute(hash: string): { kind: 'invite'; payload: string } | 
 export default function App() {
   const route = parseRoute(window.location.hash);
   if (route.kind === 'invite') {
-    // TODO(T6): return <InvitePage payload={route.payload} />
-    return <main data-surface="invite-placeholder" className="p-8">invite placeholder</main>;
+    return <InvitePage payload={route.payload} />;
   }
   // TODO(T7): return <EditorPage />
-  return <main data-surface="editor-placeholder" className="p-8">editor placeholder</main>;
+  return <main data-testid="editor-placeholder" className="p-8">editor placeholder</main>;
 }
