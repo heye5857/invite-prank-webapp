@@ -4,6 +4,9 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  // Relative base: hash routing means assets resolve correctly both in dev,
+  // on GitHub Pages project subpath (/repo-name/), and on Netlify/Vercel drops.
+  base: './',
   plugins: [
     react(),
     VitePWA({
