@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dev-dist/
+qa-artifacts/
+.omo/
+playwright-report/
+test-results/
+*.local
+.env*
+!.env.example
+Thumbs.db
+.DS_Store
