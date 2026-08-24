@@ -29,18 +29,12 @@ npm run e2e        # Playwright E2E(需先 npx playwright install chromium)
 
 ## 部署
 
-### GitHub Pages(預設管線)
+**🌐 正式網站:https://heye5857.github.io/invite-prank-webapp/**
 
-`.github/workflows/deploy.yml` 已就緒:push 到 `main` 即自動建置部署。
-**注意**:私有 repo 的 Pages 需要 GitHub **Pro**(付費)方案;免費帳號請用以下替代或將 repo 轉公開:
+repo 為公開 + GitHub Pages(Actions 來源)已啟用:push 到 `main` 即自動建置部署,約一分鐘後上線。
+驗證部署:`node scripts/live-smoke.mjs`(在正式網站產生連結並以全新頁面開啟,證明朋友打得開)。
 
-```bash
-gh repo edit --visibility public --accept-visibility-change-consequences
-```
-
-啟用:Settings → Pages → Source 選 **GitHub Actions**。
-
-### Vercel / Netlify(零設定替代)
+### Vercel / Netlify(替代)
 
 `npm run build` 後把 `dist/` 資料夾拖進 [Netlify Drop](https://app.netlify.com/drop) 或 Vercel 即可上線(base 已設相對路徑,任何子路徑都能跑)。
 
