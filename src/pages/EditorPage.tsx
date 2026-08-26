@@ -167,6 +167,21 @@ export default function EditorPage() {
       modes: on ? [...draft.gag.modes, id] : draft.gag.modes.filter((m) => m !== id),
     });
 
+  /** Swap a mode with its neighbour so the user controls which gag hits first. */
+  const moveMode = (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= draft.gag.modes.length) return;
+    setGag({
+      modes: draft.gag.modes.map((m, i) =>
+        i === index
+          ? (draft.gag.modes[target] ?? m)
+          : i === target
+            ? (draft.gag.modes[index] ?? m)
+            : m,
+      ),
+    });
+  };
+
   const updateStep = (index: number, patch: Partial<DisagreeStep>) =>
     setFlow({
       steps: draft.disagreeFlow.steps.map((s, i) => (i === index ? { ...s, ...patch } : s)),
@@ -384,20 +399,46 @@ export default function EditorPage() {
               </div>
             </fieldset>
             {draft.gag.modes.length > 0 && (
-              <ul className="flex flex-wrap gap-2">
-                {draft.gag.modes.map((id, i) => {
-                  const found = GAG_MODE_LABELS.find((m) => m.id === id);
-                  return (
-                    <li
-                      key={id}
-                      data-testid={`mode-chip-${id}`}
-                      className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700"
-                    >
-                      {i + 1} {found?.label ?? id}
-                    </li>
-                  );
-                })}
-              </ul>
+              <div className="space-y-1">
+                <p className="text-xs text-neutral-500">
+                  手法會依序輪替（排第一個的最先出現）——用 ↑↓ 調整順序
+                </p>
+                <ul className="flex flex-wrap gap-2">
+                  {draft.gag.modes.map((id, i) => {
+                    const found = GAG_MODE_LABELS.find((m) => m.id === id);
+                    const label = found?.label ?? id;
+                    return (
+                      <li
+                        key={id}
+                        data-testid={`mode-chip-${id}`}
+                        className="flex items-center gap-1 rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700"
+                      >
+                        <span>
+                          {i + 1} {label}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`把${label}往前移`}
+                          disabled={i === 0}
+                          onClick={() => moveMode(i, -1)}
+                          className="rounded px-1 leading-none hover:bg-violet-200 disabled:opacity-30"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`把${label}往後移`}
+                          disabled={i === draft.gag.modes.length - 1}
+                          onClick={() => moveMode(i, 1)}
+                          className="rounded px-1 leading-none hover:bg-violet-200 disabled:opacity-30"
+                        >
+                          ↓
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             )}
 
             {draft.gag.modes.includes('dodge') && (

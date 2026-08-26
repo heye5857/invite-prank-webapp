@@ -236,3 +236,26 @@ describe('EditorPage — share link auto-refresh', () => {
     expect(decoded.config.intro.title).toBe(`${DEFAULT_CONFIG.intro.title}自動更新`);
   });
 });
+
+describe('EditorPage — gag mode ordering', () => {
+  it('↑/↓ buttons reorder the mode queue; edge chips are disabled', async () => {
+    const user = userEvent.setup();
+    render(<EditorPage />);
+
+    const order = () => screen.getAllByTestId(/^mode-chip-/).map((el) => el.textContent ?? '');
+    // DEFAULT_CONFIG ships all five modes: dodge first, confirmLoop last.
+    expect(order()[0]).toContain('逃跑按鈕');
+    expect(screen.getByRole('button', { name: '把逃跑按鈕往前移' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '把確認轉圈圈往後移' })).toBeDisabled();
+
+    // Move dodge back → fakeErrors becomes the first gag the friend meets.
+    await user.click(screen.getByRole('button', { name: '把逃跑按鈕往後移' }));
+    expect(order()[0]).toContain('搞笑錯誤');
+    expect(order()[1]).toContain('逃跑按鈕');
+
+    // And back to the front again.
+    await user.click(screen.getByRole('button', { name: '把逃跑按鈕往前移' }));
+    expect(order()[0]).toContain('逃跑按鈕');
+    expect(order()[1]).toContain('搞笑錯誤');
+  });
+});
