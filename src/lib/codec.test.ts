@@ -52,9 +52,27 @@ const EXOTIC: InviteConfig = {
   },
 };
 
+/**
+ * A v1-era payload shape: carries disagreeFlow, lacks success.
+ * Built from DEFAULT_CONFIG so every other section stays valid.
+ */
+function v1RawPayload(): Record<string, unknown> {
+  const { success: _drop, ...rest } = DEFAULT_CONFIG;
+  return {
+    ...rest,
+    v: 1,
+    disagreeFlow: {
+      steps: [{ text: '舊版哀求一', buttonLabel: '再試一次' }],
+      loop: false,
+      finalTitle: '舊版最終標題',
+      finalText: '舊版最終內文',
+    },
+  };
+}
+
 describe('CODEC_VERSION', () => {
-  it('is 1', () => {
-    expect(CODEC_VERSION).toBe(1);
+  it('is 2', () => {
+    expect(CODEC_VERSION).toBe(2);
   });
 });
 
@@ -69,11 +87,11 @@ describe('encodeConfig/decodeConfig roundtrip', () => {
     expect(expectOk(decodeConfig(encoded))).toEqual(EXOTIC);
   });
 
-  it('roundtrips empty emojiDecor and empty steps arrays', () => {
+  it('roundtrips empty emojiDecor and empty success strings', () => {
     const cfg: InviteConfig = {
       ...DEFAULT_CONFIG,
       theme: { ...DEFAULT_CONFIG.theme, emojiDecor: [] },
-      disagreeFlow: { ...DEFAULT_CONFIG.disagreeFlow, steps: [] },
+      success: { title: '', text: '', emoji: '' },
     };
     expect(expectOk(decodeConfig(encodeConfig(cfg)))).toEqual(cfg);
   });
@@ -87,6 +105,29 @@ describe('encodeConfig/decodeConfig roundtrip', () => {
     const first = decodeConfig(encodeConfig(DEFAULT_CONFIG));
     const second = decodeConfig(encodeConfig(DEFAULT_CONFIG));
     expect(first).toEqual(second);
+  });
+});
+
+describe('v1 → v2 migration', () => {
+  it('accepts a legacy v1 payload: ok:true with v upgraded to 2', () => {
+    const res = decodeConfig(packRaw(v1RawPayload()));
+    const cfg = expectOk(res);
+    expect(cfg.v).toBe(2);
+  });
+
+  it('fills the migrated success section with the DEFAULT success values', () => {
+    const cfg = expectOk(decodeConfig(packRaw(v1RawPayload())));
+    expect(cfg.success).toEqual(DEFAULT_CONFIG.success);
+  });
+
+  it('drops disagreeFlow entirely from the migrated config', () => {
+    const cfg = expectOk(decodeConfig(packRaw(v1RawPayload())));
+    expect(Object.hasOwn(cfg, 'disagreeFlow')).toBe(false);
+  });
+
+  it('migrated config re-encodes as a clean v2 payload that decodes identically', () => {
+    const migrated = expectOk(decodeConfig(packRaw(v1RawPayload())));
+    expect(expectOk(decodeConfig(encodeConfig(migrated)))).toEqual(migrated);
   });
 });
 
@@ -147,8 +188,20 @@ describe('decodeConfig rejects malformed input without throwing', () => {
     expect(expectErr(decodeConfig(packRaw([1, 2, 3])))).toBeTruthy();
   });
 
-  it('rejects v:2 payloads with a version-specific message', () => {
-    expect(expectErr(decodeConfig(packRaw({ ...DEFAULT_CONFIG, v: 2 })))).toContain('版本');
+  it('rejects v:3 payloads with a version-specific message', () => {
+    expect(expectErr(decodeConfig(packRaw({ ...DEFAULT_CONFIG, v: 3 })))).toContain('版本');
+  });
+
+  it('rejects v:2 missing the success section and names the field', () => {
+    const { success: _drop, ...noSuccess } = DEFAULT_CONFIG;
+    const err = expectErr(decodeConfig(packRaw(noSuccess)));
+    expect(err).toContain('success');
+  });
+
+  it('rejects success.title of wrong type (number) and names the field', () => {
+    const success = { ...DEFAULT_CONFIG.success, title: 42 };
+    const err = expectErr(decodeConfig(packRaw({ ...DEFAULT_CONFIG, success })));
+    expect(err).toContain('success.title');
   });
 
   it('rejects missing gag.fakeLoad and names the field', () => {
@@ -171,12 +224,6 @@ describe('decodeConfig rejects malformed input without throwing', () => {
     const gag = { ...DEFAULT_CONFIG.gag, modes: [...DEFAULT_CONFIG.gag.modes, 'bomb'] };
     expect(expectErr(decodeConfig(packRaw({ ...DEFAULT_CONFIG, gag })))).toContain('bomb');
   });
-
-  it('rejects a step missing buttonLabel and names the field', () => {
-    const disagreeFlow = { ...DEFAULT_CONFIG.disagreeFlow, steps: [{ text: '嗯…' }] };
-    const err = expectErr(decodeConfig(packRaw({ ...DEFAULT_CONFIG, disagreeFlow })));
-    expect(err).toContain('buttonLabel');
-  });
 });
 
 describe('decodeConfig accepts valid variants', () => {
@@ -194,6 +241,12 @@ describe('decodeConfig accepts valid variants', () => {
 
   it('ignores unknown extra keys instead of rejecting', () => {
     const out = expectOk(decodeConfig(packRaw({ ...DEFAULT_CONFIG, futureField: { deep: [1, 2] } })));
+    expect(out).toEqual(DEFAULT_CONFIG);
+  });
+
+  it('ignores a stray disagreeFlow key on a v2 payload (dropped on rebuild)', () => {
+    const raw = { ...DEFAULT_CONFIG, disagreeFlow: { steps: [], loop: true, finalTitle: 'x', finalText: 'y' } };
+    const out = expectOk(decodeConfig(packRaw(raw)));
     expect(out).toEqual(DEFAULT_CONFIG);
   });
 });

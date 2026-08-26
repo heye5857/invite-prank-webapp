@@ -8,7 +8,7 @@ import type { InviteConfig } from '../src/types';
 
 mkdirSync('qa-artifacts/e2e', { recursive: true });
 
-test('s1: happy path — intro, question, agree proves gag interaction alive', async ({
+test('s1: happy path — intro, question, 同意 lands on the celebration screen', async ({
   page,
 }, testInfo) => {
   const cfg: InviteConfig = {
@@ -26,20 +26,11 @@ test('s1: happy path — intro, question, agree proves gag interaction alive', a
   await page.getByTestId('intro-cta').click();
   await expect(page.getByTestId('question-text')).toContainText('這週六');
 
-  // Engine contract: every mode visit gets dodge.times(=3) presses before
-  // falling through, and DEFAULT_CONFIG.modes[0] is 'dodge'. So presses 1-3
-  // are eaten by dodge; press 4 reaches fakeErrors step 0 -> its first toast.
-  const agree = page.getByTestId('btn-agree');
-  for (let i = 0; i < 4; i += 1) {
-    try {
-      await agree.click({ timeout: 2500 });
-    } catch {
-      // Dodge can park the button beneath btn-disagree on narrow viewports,
-      // making a real pointer click impossible by design; fire the handler.
-      await agree.dispatchEvent('click');
-    }
-  }
-  const toast = page.getByTestId('gag-overlay-toast');
-  await expect(toast).toBeVisible();
-  await expect(toast).toContainText('系統繁忙中'); // errors.messages[0]
+  // Inverted contract: 同意 succeeds IMMEDIATELY — no gag, straight to success.
+  await page.getByTestId('btn-agree').click();
+  const successTitle = page.getByTestId('success-title');
+  await expect(successTitle).toBeVisible();
+  await expect(successTitle).toContainText('耶！約成功了'); // DEFAULT success.title
+  await expect(page.getByTestId('success-emoji')).toContainText(DEFAULT_CONFIG.success.emoji);
+  await page.screenshot({ path: `qa-artifacts/e2e/s1-success-${testInfo.project.name}.png` });
 });

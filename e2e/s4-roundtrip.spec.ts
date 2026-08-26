@@ -18,4 +18,9 @@ test('s4: editor → share link → invite roundtrip via hashchange', async ({ p
   await page.goto(url);
   await expect(page.getByTestId('intro-title')).toHaveText('S4往返測試XYZ');
   await page.screenshot({ path: 'qa-artifacts/e2e/s4-invite.png' });
+
+  // The decoded v2 payload keeps the success flow reachable end to end.
+  await page.getByTestId('intro-cta').click();
+  await page.getByTestId('btn-agree').click();
+  await expect(page.getByTestId('success-title')).toContainText('耶！約成功了');
 });

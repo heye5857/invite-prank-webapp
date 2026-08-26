@@ -1,10 +1,11 @@
 import type { GagConfig, MilestonesCfg } from '../types';
 
 /**
- * Pure agree-button gag state machine (T4). Zero React/DOM: the UI layer owns
- * rendering and gating, this module only answers "what happens next".
+ * Pure prank-button (不同意) gag state machine (T4). Zero React/DOM: the UI
+ * layer owns rendering and gating, this module only answers "what happens next".
  *
- * Agree NEVER succeeds — there is no success state in any type or branch.
+ * The 不同意 press NEVER succeeds — there is no refusal state in any type or
+ * branch; the only way out is the 同意 button.
  */
 
 /** Dodge displacement range in px (offset.x ∈ [-120, 120]). */
@@ -23,7 +24,7 @@ const FALLBACK_ERROR_MESSAGE = '系統異常';
 const FALLBACK_CONFIRM_PROMPT = '你確定嗎？';
 
 export type GagAction =
-  | { type: 'AGREE_PRESS'; rand?: () => number }
+  | { type: 'PRANK_PRESS'; rand?: () => number }
   | { type: 'DISMISS' };
 
 export type GagOverlay =
@@ -33,16 +34,16 @@ export type GagOverlay =
   | null;
 
 export interface GagState {
-  /** total agree presses */
+  /** total prank-button (不同意) presses */
   attempt: number;
   /** index into cfg.modes (wraps) */
   modeIdx: number;
   /** presses consumed by the current mode visit */
   stepInMode: number;
   /** agree button scale, starts at 1 */
-  scaleAgree: number;
+  scalePrank: number;
   /** disagree button scale, starts at 1 */
-  scaleDisagree: number;
+  scaleEscape: number;
   /** dodge displacement, px */
   offset: { x: number; y: number };
   overlay: GagOverlay;
@@ -59,8 +60,8 @@ export function createInitialGagState(): GagState {
     attempt: 0,
     modeIdx: 0,
     stepInMode: 0,
-    scaleAgree: 1,
-    scaleDisagree: 1,
+    scalePrank: 1,
+    scaleEscape: 1,
     offset: { x: 0, y: 0 },
     overlay: null,
     milestoneMessage: null,
@@ -69,7 +70,7 @@ export function createInitialGagState(): GagState {
 
 export function reduceGag(state: GagState, action: GagAction, cfg: GagConfig): GagState {
   switch (action.type) {
-    case 'AGREE_PRESS':
+    case 'PRANK_PRESS':
       return agreePress(state, action.rand, cfg);
     case 'DISMISS':
       return dismissOverlay(state, cfg);
@@ -85,6 +86,8 @@ export function reduceGag(state: GagState, action: GagAction, cfg: GagConfig): G
  * the UI layer's decision.
  */
 function agreePress(state: GagState, rand: (() => number) | undefined, cfg: GagConfig): GagState {
+  // Handles one prank-button (不同意) press; name kept from the pre-inversion
+  // engine to keep the diff mechanical — semantics are identical.
   const attempt = state.attempt + 1;
   const milestoneMessage = milestoneFor(attempt, cfg.milestones);
   if (cfg.modes.length === 0) {
@@ -148,8 +151,8 @@ function agreePress(state: GagState, rand: (() => number) | undefined, cfg: GagC
         milestoneMessage,
         modeIdx,
         stepInMode: stepInMode + 1,
-        scaleAgree: Math.max(cfg.shrink.minScale, state.scaleAgree * SHRINK_FACTOR),
-        scaleDisagree: Math.min(SCALE_DISAGREE_MAX, state.scaleDisagree * ENLARGE_FACTOR),
+        scalePrank: Math.max(cfg.shrink.minScale, state.scalePrank * SHRINK_FACTOR),
+        scaleEscape: Math.min(SCALE_DISAGREE_MAX, state.scaleEscape * ENLARGE_FACTOR),
       };
     case 'confirmLoop': {
       const prompts = cfg.confirmLoop.prompts;
@@ -191,3 +194,4 @@ function milestoneFor(attempt: number, milestones: MilestonesCfg): string | null
   const index = (attempt / milestones.everyN - 1) % milestones.messages.length;
   return milestones.messages[index] ?? null;
 }
+

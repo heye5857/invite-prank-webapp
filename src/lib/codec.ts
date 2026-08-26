@@ -3,21 +3,24 @@
  * Pipeline: JSON.stringify -> fflate.deflateSync -> unpadded base64url.
  * decodeConfig never throws: every failure mode returns { ok:false, error }.
  * Unknown extra keys in a payload are ignored (dropped on rebuild), never rejected.
+ * v1 legacy payloads (disagreeFlow era) are migrated to v2: disagreeFlow is
+ * dropped and `success` is filled with the DEFAULT success values.
  */
 import { deflateSync, inflateSync, strFromU8, strToU8 } from 'fflate';
 
+import { DEFAULT_CONFIG } from '../defaults';
 import type {
-  DisagreeFlowConfig,
   GagConfig,
   GagModeId,
   IntroConfig,
   InviteConfig,
   NotifyConfig,
   QuestionConfig,
+  SuccessConfig,
   ThemeConfig,
 } from '../types';
 
-export const CODEC_VERSION = 1;
+export const CODEC_VERSION = 2;
 
 export type DecodeResult =
   | { ok: true; config: InviteConfig }
@@ -70,12 +73,6 @@ function req(v: Rec, key: string, path: string): unknown {
 function reqObj(v: Rec, key: string, path: string): Rec {
   const val = req(v, key, path);
   if (!isRec(val)) throw new CodecError(`「${path}」必須是物件`);
-  return val;
-}
-
-function reqArr(v: Rec, key: string, path: string): unknown[] {
-  const val = req(v, key, path);
-  if (!Array.isArray(val)) throw new CodecError(`「${path}」必須是陣列`);
   return val;
 }
 
@@ -165,20 +162,11 @@ function parseGag(v: Rec): GagConfig {
   };
 }
 
-function parseDisagreeFlow(v: Rec): DisagreeFlowConfig {
-  const stepsRaw = reqArr(v, 'steps', 'disagreeFlow.steps');
-  const steps = stepsRaw.map((s, i) => {
-    if (!isRec(s)) throw new CodecError(`「disagreeFlow.steps[${i}]」必須是物件`);
-    return {
-      text: reqStr(s, 'text', `disagreeFlow.steps[${i}].text`),
-      buttonLabel: reqStr(s, 'buttonLabel', `disagreeFlow.steps[${i}].buttonLabel`),
-    };
-  });
+function parseSuccess(v: Rec): SuccessConfig {
   return {
-    steps,
-    loop: reqBool(v, 'loop', 'disagreeFlow.loop'),
-    finalTitle: reqStr(v, 'finalTitle', 'disagreeFlow.finalTitle'),
-    finalText: reqStr(v, 'finalText', 'disagreeFlow.finalText'),
+    title: reqStr(v, 'title', 'success.title'),
+    text: reqStr(v, 'text', 'success.text'),
+    emoji: reqStr(v, 'emoji', 'success.emoji'),
   };
 }
 
@@ -194,16 +182,23 @@ function parseNotify(v: Rec): NotifyConfig {
 function parseInviteConfig(v: unknown): InviteConfig {
   if (!isRec(v)) throw new CodecError('邀請設定必須是 JSON 物件');
   const version = req(v, 'v', 'v');
-  if (version !== 1) throw new CodecError(`不支援的設定版本：${String(version)}（僅支援 v=1）`);
-  return {
-    v: 1,
+  const sections = {
     theme: parseTheme(reqObj(v, 'theme', 'theme')),
     intro: parseIntro(reqObj(v, 'intro', 'intro')),
     question: parseQuestion(reqObj(v, 'question', 'question')),
     gag: parseGag(reqObj(v, 'gag', 'gag')),
-    disagreeFlow: parseDisagreeFlow(reqObj(v, 'disagreeFlow', 'disagreeFlow')),
     notify: parseNotify(reqObj(v, 'notify', 'notify')),
   };
+  if (version === 1) {
+    // Legacy v1 payload: disagreeFlow is dropped; success defaults are filled in.
+    return { v: CODEC_VERSION, ...sections, success: { ...DEFAULT_CONFIG.success } };
+  }
+  if (version === CODEC_VERSION) {
+    return { v: CODEC_VERSION, ...sections, success: parseSuccess(reqObj(v, 'success', 'success')) };
+  }
+  throw new CodecError(
+    `不支援的設定版本：${String(version)}（僅支援 v=1（自動升級）與 v=${CODEC_VERSION}）`,
+  );
 }
 
 // ---------- public API ----------

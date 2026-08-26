@@ -1,6 +1,6 @@
 /**
  * EditorPage (T7) — the customization studio.
- * Left: form cards (theme / intro / question / gags / disagree flow / notify).
+ * Left: form cards (theme / intro / question / disagree gags / success page / notify).
  * Right (lg+): sticky phone-frame live preview; mobile gets the same preview
  * below the form. Autosaves to localStorage ('invite-draft', 300ms debounce),
  * generates a share link via lib/codec, and renders QR codes for the share /
@@ -17,13 +17,12 @@ import type { ThemePreset } from '../defaults';
 import { buildShareUrl } from '../lib/codec';
 import { generateUuid } from '../lib/uuid';
 import type {
-  DisagreeFlowConfig,
-  DisagreeStep,
   GagConfig,
   GagModeId,
   IntroConfig,
   InviteConfig,
   QuestionConfig,
+  SuccessConfig,
   ThemeConfig,
 } from '../types';
 
@@ -56,7 +55,7 @@ function loadDraft(): InviteConfig {
       typeof parsed === 'object' &&
       parsed !== null &&
       'v' in parsed &&
-      (parsed as { v?: unknown }).v === 1
+      (parsed as { v?: unknown }).v === 2
     ) {
       return parsed as InviteConfig;
     }
@@ -151,8 +150,8 @@ export default function EditorPage() {
     setDraft((d) => ({ ...d, question: { ...d.question, ...patch } }));
   const setGag = (patch: Partial<GagConfig>) =>
     setDraft((d) => ({ ...d, gag: { ...d.gag, ...patch } }));
-  const setFlow = (patch: Partial<DisagreeFlowConfig>) =>
-    setDraft((d) => ({ ...d, disagreeFlow: { ...d.disagreeFlow, ...patch } }));
+  const setSuccess = (patch: Partial<SuccessConfig>) =>
+    setDraft((d) => ({ ...d, success: { ...d.success, ...patch } }));
 
   const applyPreset = (preset: ThemePreset) =>
     setTheme({
@@ -181,11 +180,6 @@ export default function EditorPage() {
       ),
     });
   };
-
-  const updateStep = (index: number, patch: Partial<DisagreeStep>) =>
-    setFlow({
-      steps: draft.disagreeFlow.steps.map((s, i) => (i === index ? { ...s, ...patch } : s)),
-    });
 
   const numFrom = (e: ChangeEvent<HTMLInputElement>): number => e.target.valueAsNumber;
 
@@ -377,8 +371,11 @@ export default function EditorPage() {
             </label>
           </Card>
 
-          {/* D. 整人手法 */}
-          <Card icon="😈" title="整人手法">
+          {/* D. 不同意整人手法 */}
+          <Card icon="😈" title="不同意整人手法">
+            <p className="text-sm text-neutral-500">
+              朋友按「不同意」時觸發——讓他們只能同意 😈
+            </p>
             <fieldset>
               <legend className={LABEL_CLS}>啟用的手法（順序＝點選順序）</legend>
               <div className="mt-2 space-y-2">
@@ -576,81 +573,37 @@ export default function EditorPage() {
             </label>
           </Card>
 
-          {/* E. 不同意流程 */}
-          <Card icon="🥺" title="不同意流程">
-            {draft.disagreeFlow.steps.map((step, i) => (
-              <div key={i} className="space-y-3 rounded-xl border border-neutral-200 p-3">
-                <p className="text-sm font-bold text-violet-600">第 {i + 1} 段</p>
-                <label className="space-y-1">
-                  <span className={LABEL_CLS}>說明文字</span>
-                  <input
-                    type="text"
-                    aria-label={`第 ${i + 1} 段說明文字`}
-                    className={INPUT_CLS}
-                    value={step.text}
-                    onChange={(e) => updateStep(i, { text: e.target.value })}
-                  />
-                </label>
-                <div className="flex items-end gap-2">
-                  <label className="flex-1 space-y-1">
-                    <span className={LABEL_CLS}>按鈕文字</span>
-                    <input
-                      type="text"
-                      aria-label={`第 ${i + 1} 段按鈕文字`}
-                      className={INPUT_CLS}
-                      value={step.buttonLabel}
-                      onChange={(e) => updateStep(i, { buttonLabel: e.target.value })}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    aria-label={`刪除第 ${i + 1} 段`}
-                    onClick={() =>
-                      setFlow({ steps: draft.disagreeFlow.steps.filter((_, j) => j !== i) })
-                    }
-                    className="rounded-lg border border-red-200 px-3 py-2 text-sm font-bold text-red-500 hover:bg-red-50"
-                  >
-                    刪除
-                  </button>
-                </div>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() =>
-                setFlow({
-                  steps: [...draft.disagreeFlow.steps, { text: '', buttonLabel: '繼續' }],
-                })
-              }
-              className="rounded-lg border border-violet-300 px-4 py-2 text-sm font-bold text-violet-600 hover:bg-violet-50"
-            >
-              ＋ 新增一段
-            </button>
-            <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
-              <input
-                type="checkbox"
-                checked={draft.disagreeFlow.loop}
-                onChange={(e) => setFlow({ loop: e.target.checked })}
-                className="h-4 w-4 accent-violet-600"
-              />
-              永遠循環（永遠到不了最後一頁 😈）
-            </label>
+          {/* E. 成功頁 */}
+          <Card icon="🎉" title="成功頁">
+            <p className="text-sm text-neutral-500">
+              朋友按「同意」時立刻看到的慶祝畫面 🎊
+            </p>
             <label className="space-y-1">
-              <span className={LABEL_CLS}>最終標題</span>
+              <span className={LABEL_CLS}>成功標題</span>
               <input
                 type="text"
                 className={INPUT_CLS}
-                value={draft.disagreeFlow.finalTitle}
-                onChange={(e) => setFlow({ finalTitle: e.target.value })}
+                value={draft.success.title}
+                onChange={(e) => setSuccess({ title: e.target.value })}
               />
             </label>
             <label className="space-y-1">
-              <span className={LABEL_CLS}>最終內容</span>
+              <span className={LABEL_CLS}>成功內容</span>
               <input
                 type="text"
                 className={INPUT_CLS}
-                value={draft.disagreeFlow.finalText}
-                onChange={(e) => setFlow({ finalText: e.target.value })}
+                value={draft.success.text}
+                onChange={(e) => setSuccess({ text: e.target.value })}
+              />
+            </label>
+            <label className="space-y-1">
+              <span className={LABEL_CLS}>慶祝 emoji</span>
+              <input
+                type="text"
+                maxLength={2}
+                className={INPUT_CLS}
+                value={draft.success.emoji}
+                onChange={(e) => setSuccess({ emoji: e.target.value })}
               />
             </label>
           </Card>

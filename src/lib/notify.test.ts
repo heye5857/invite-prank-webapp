@@ -31,9 +31,9 @@ describe('createNotifier', () => {
     vi.restoreAllMocks();
   });
 
-  it('first agreeAttempt publishes immediately with count 1 and warning tag', () => {
+  it('first disagreeAttempt publishes immediately with count 1 and warning tag', () => {
     const { notifier, fetchMock } = setup('party');
-    notifier.agreeAttempt();
+    notifier.disagreeAttempt();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
       `https://ntfy.sh/party?title=${TITLE_ENCODED}&tags=warning`,
@@ -41,36 +41,60 @@ describe('createNotifier', () => {
     expect(fetchMock.mock.calls[0]?.[1]).toEqual({
       method: 'POST',
       keepalive: true,
-      body: '朋友按了第 1 次同意',
+      body: '朋友按了第 1 次不同意',
     });
   });
 
-  it('agreeAttempt calls within the window aggregate silently with no extra fetch', () => {
+  it('disagreeAttempt calls within the window aggregate silently with no extra fetch', () => {
     const { notifier, fetchMock } = setup('party');
-    notifier.agreeAttempt(); // t=0 → send
+    notifier.disagreeAttempt(); // t=0 → send
     advance(1000);
-    notifier.agreeAttempt(); // pending=1
+    notifier.disagreeAttempt(); // pending=1
     advance(1000);
-    notifier.agreeAttempt(); // pending=2
+    notifier.disagreeAttempt(); // pending=2
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('first agreeAttempt after the window publishes one summary of pending+current and restarts the window', () => {
+  it('first disagreeAttempt after the window publishes one summary of pending+current and restarts the window', () => {
     const { notifier, fetchMock } = setup('party');
-    notifier.agreeAttempt(); // t=0 → send count 1
+    notifier.disagreeAttempt(); // t=0 → send count 1
     advance(30_000);
-    notifier.agreeAttempt(); // t=30k → pending=1, silent
+    notifier.disagreeAttempt(); // t=30k → pending=1, silent
     advance(31_000); // t=61k → window elapsed
-    notifier.agreeAttempt(); // summary N = pending(1) + current(1) = 2
+    notifier.disagreeAttempt(); // summary N = pending(1) + current(1) = 2
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[1]?.[1]).toEqual({
       method: 'POST',
       keepalive: true,
-      body: '朋友已累積嘗試 2 次同意',
+      body: '朋友已累積嘗試 2 次不同意',
     });
     advance(1000); // t=62k → inside the restarted window
-    notifier.agreeAttempt();
+    notifier.disagreeAttempt();
     expect(fetchMock).toHaveBeenCalledTimes(2); // restart proven: nothing new sent
+  });
+
+  it('agreed publishes the payoff message with tada tag via POST keepalive', () => {
+    const { notifier, fetchMock } = setup('party');
+    notifier.agreed();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      `https://ntfy.sh/party?title=${TITLE_ENCODED}&tags=tada`,
+    );
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual({
+      method: 'POST',
+      keepalive: true,
+      body: '朋友同意了！🎉',
+    });
+  });
+
+  it('agreed has NO throttle bucket: every call sends (payoff event)', () => {
+    const { notifier, fetchMock } = setup('party');
+    notifier.agreed();
+    advance(0);
+    notifier.agreed();
+    advance(59_999);
+    notifier.agreed();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('opened publishes the exact encoded URL, plain-text body and mailbox tag via POST keepalive', () => {
@@ -95,34 +119,12 @@ describe('createNotifier', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('gaveUp publishes the step number, flag emoji and white_flag tag', () => {
-    const { notifier, fetchMock } = setup('party');
-    notifier.gaveUp(2);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      `https://ntfy.sh/party?title=${TITLE_ENCODED}&tags=white_flag`,
-    );
-    expect(fetchMock.mock.calls[0]?.[1]).toEqual({
-      method: 'POST',
-      keepalive: true,
-      body: '朋友按了「不同意」（第 2 步）🏳️',
-    });
-  });
-
-  it('gaveUp shares one throttle bucket regardless of step', () => {
-    const { notifier, fetchMock } = setup('party');
-    notifier.gaveUp(1);
-    advance(1000);
-    notifier.gaveUp(2);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
   it('null topic makes every method a noop with zero fetch calls', () => {
     const { notifier, fetchMock } = setup(null);
     expect(() => {
       notifier.opened();
-      notifier.agreeAttempt();
-      notifier.gaveUp(1);
+      notifier.disagreeAttempt();
+      notifier.agreed();
     }).not.toThrow();
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -131,8 +133,8 @@ describe('createNotifier', () => {
     const { notifier, fetchMock } = setup('');
     expect(() => {
       notifier.opened();
-      notifier.agreeAttempt();
-      notifier.gaveUp(3);
+      notifier.disagreeAttempt();
+      notifier.agreed();
     }).not.toThrow();
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -178,10 +180,10 @@ describe('createNotifier', () => {
     expect(shared).toHaveBeenCalledTimes(2);
   });
 
-  it('opened and gaveUp maintain independent buckets', () => {
+  it('opened and disagreeAttempt maintain independent buckets', () => {
     const { notifier, fetchMock } = setup('party');
     notifier.opened();
-    notifier.gaveUp(1);
+    notifier.disagreeAttempt();
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -204,18 +206,18 @@ describe('createNotifier', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('agreeAttempt flushes its summary when exactly 60000ms have elapsed', () => {
+  it('disagreeAttempt flushes its summary when exactly 60000ms have elapsed', () => {
     const { notifier, fetchMock } = setup('party');
-    notifier.agreeAttempt(); // t=0 → send count 1
+    notifier.disagreeAttempt(); // t=0 → send count 1
     advance(30_000);
-    notifier.agreeAttempt(); // pending=1
+    notifier.disagreeAttempt(); // pending=1
     advance(30_000); // t=60000 exactly → window expired
-    notifier.agreeAttempt(); // summary N=2
+    notifier.disagreeAttempt(); // summary N=2
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[1]?.[1]).toEqual({
       method: 'POST',
       keepalive: true,
-      body: '朋友已累積嘗試 2 次同意',
+      body: '朋友已累積嘗試 2 次不同意',
     });
   });
 });

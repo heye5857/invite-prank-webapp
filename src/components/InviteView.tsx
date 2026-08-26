@@ -1,7 +1,11 @@
 /**
  * InviteView (T6) — the ONE renderer shared by the standalone invite route and
- * the future editor live-preview. Presentational + local flow state only; all
- * gag outcomes come from the pure engine in lib/gagEngine.ts.
+ * the editor live-preview. Presentational + local flow state only; all gag
+ * outcomes come from the pure engine in lib/gagEngine.ts.
+ *
+ * Inverted prank flow: 同意 succeeds IMMEDIATELY (celebration screen — the
+ * whole point is driving the friend to agree), while 不同意 triggers the five
+ * gag behaviors and can NEVER succeed.
  *
  * Export contract for later waves: named export `InviteView` with props
  * `{ config: InviteConfig; notifier?: Notifier }` (notifier omitted = silent).
@@ -12,9 +16,9 @@ import type { CSSProperties } from 'react';
 import { createInitialGagState, reduceGag } from '../lib/gagEngine';
 import type { GagOverlay, GagState } from '../lib/gagEngine';
 import type { Notifier } from '../lib/notify';
-import type { DisagreeFlowConfig, InviteConfig } from '../types';
+import type { InviteConfig } from '../types';
 
-type Screen = 'intro' | 'question' | 'disagree' | 'final';
+type Screen = 'intro' | 'question' | 'success';
 
 function assertNever(value: never): never {
   throw new Error(`unexpected value: ${String(value)}`);
@@ -44,7 +48,6 @@ export interface InviteViewProps {
 export function InviteView({ config, notifier, rootTestId = 'invite-root' }: InviteViewProps) {
   const [screen, setScreen] = useState<Screen>('intro');
   const [gag, setGag] = useState<GagState>(createInitialGagState);
-  const [disagreeStep, setDisagreeStep] = useState(0);
 
   // A new gag configuration is a NEW simulation: reset the engine state so the
   // editor preview always reflects the current modes from press #1. Without
@@ -72,35 +75,16 @@ export function InviteView({ config, notifier, rootTestId = 'invite-root' }: Inv
     '--inv-text': config.theme.textColor,
   } as CSSProperties;
 
+  // 同意 succeeds immediately — the celebration screen IS the product.
   const pressAgree = () => {
-    setGag((prev) => reduceGag(prev, { type: 'AGREE_PRESS' }, config.gag));
-    notifier?.agreeAttempt();
+    setScreen('success');
+    notifier?.agreed();
   };
 
-  const enterDisagree = () => {
-    if (config.disagreeFlow.steps.length === 0) {
-      setScreen('final');
-      return;
-    }
-    setDisagreeStep(0);
-    setScreen('disagree');
-    notifier?.gaveUp(1);
-  };
-
-  const advanceDisagree = () => {
-    const { steps, loop } = config.disagreeFlow;
-    const next = disagreeStep + 1;
-    if (next < steps.length) {
-      setDisagreeStep(next);
-      notifier?.gaveUp(next + 1);
-      return;
-    }
-    if (loop) {
-      setDisagreeStep(0);
-      notifier?.gaveUp(1);
-      return;
-    }
-    setScreen('final');
+  // 不同意 is the prank button: gag engine + notify, never a refusal.
+  const pressDisagree = () => {
+    setGag((prev) => reduceGag(prev, { type: 'PRANK_PRESS' }, config.gag));
+    notifier?.disagreeAttempt();
   };
 
   const panel = () => {
@@ -143,17 +127,20 @@ export function InviteView({ config, notifier, rootTestId = 'invite-root' }: Inv
                 type="button" data-testid="btn-agree" onClick={pressAgree}
                 style={{
                   backgroundColor: 'var(--inv-accent)',
-                  transform: `translate(${gag.offset.x}px, ${gag.offset.y}px) scale(${gag.scaleAgree})`,
+                  // The escape hatch: never dodges, and GROWS as the friend
+                  // keeps refusing — always easy to press.
+                  transform: `scale(${gag.scaleEscape})`,
                 }}
                 className={BTN_BASE}
               >
                 {config.question.agreeLabel}
               </button>
               <button
-                type="button" data-testid="btn-disagree" onClick={enterDisagree}
+                type="button" data-testid="btn-disagree" onClick={pressDisagree}
                 style={{
                   backgroundColor: 'var(--inv-accent)',
-                  transform: `scale(${gag.scaleDisagree})`,
+                  // The prank target: dodges the press and shrinks away.
+                  transform: `translate(${gag.offset.x}px, ${gag.offset.y}px) scale(${gag.scalePrank})`,
                 }}
                 className={BTN_BASE}
               >
@@ -162,29 +149,30 @@ export function InviteView({ config, notifier, rootTestId = 'invite-root' }: Inv
             </div>
           </section>
         );
-      case 'disagree': {
-        const step = config.disagreeFlow.steps[disagreeStep];
-        if (step === undefined) {
-          // Out-of-range index (defensive under noUncheckedIndexedAccess): show final.
-          return <FinalPanel flow={config.disagreeFlow} />;
-        }
+      case 'success':
         return (
-          <section className="flex min-h-dvh flex-col items-center justify-center gap-8 text-center">
-            <p data-testid="disagree-step-text" className="text-2xl font-bold leading-relaxed">
-              {step.text}
-            </p>
-            <button
-              type="button" data-testid="disagree-next-btn" onClick={advanceDisagree}
-              style={{ backgroundColor: 'var(--inv-accent)' }}
-              className={`${BTN_BASE} w-full max-w-xs text-lg active:scale-95`}
+          <section
+            className="flex min-h-dvh flex-col items-center justify-center gap-6 text-center"
+            style={{
+              backgroundImage:
+                'linear-gradient(to bottom, color-mix(in srgb, var(--inv-accent) 10%, transparent), transparent)',
+            }}
+          >
+            <span
+              data-testid="success-emoji"
+              aria-hidden
+              className="animate-bounce select-none text-7xl"
             >
-              {step.buttonLabel}
-            </button>
+              {config.success.emoji}
+            </span>
+            <h2 data-testid="success-title" className="text-3xl font-black">
+              {config.success.title}
+            </h2>
+            <p data-testid="success-text" className="text-lg opacity-80">
+              {config.success.text}
+            </p>
           </section>
         );
-      }
-      case 'final':
-        return <FinalPanel flow={config.disagreeFlow} />;
       default:
         return assertNever(screen);
     }
@@ -212,17 +200,6 @@ export function InviteView({ config, notifier, rootTestId = 'invite-root' }: Inv
       {panel()}
       <GagOverlayLayer overlay={gag.overlay} onDismiss={dismiss} />
     </div>
-  );
-}
-
-function FinalPanel({ flow }: { flow: DisagreeFlowConfig }) {
-  return (
-    <section className="flex min-h-dvh flex-col items-center justify-center gap-6 text-center">
-      <h2 data-testid="final-title" className="text-3xl font-black">
-        {flow.finalTitle}
-      </h2>
-      <p className="text-lg opacity-80">{flow.finalText}</p>
-    </section>
   );
 }
 

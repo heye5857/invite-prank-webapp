@@ -26,7 +26,7 @@ export function presetById(id: string): ThemePreset | undefined {
  * All copy is zh-TW with a playful tone.
  */
 export const DEFAULT_CONFIG: InviteConfig = {
-  v: 1,
+  v: 2,
   theme: {
     presetId: 'grape',
     bg: '#faf5ff',
@@ -69,15 +69,10 @@ export const DEFAULT_CONFIG: InviteConfig = {
       messages: ['毅力可嘉，但還是不行 💪', '你已經成為傳說了，可惜還是不能同意'],
     },
   },
-  disagreeFlow: {
-    steps: [
-      { text: '什麼？！你居然拒絕了 🥺', buttonLabel: '再給你一次機會' },
-      { text: '我會傷心到下禮拜…', buttonLabel: '好吧，我再想想' },
-      { text: '最後問一次，真的不要嗎？', buttonLabel: '…好啦，同意啦' },
-    ],
-    loop: false,
-    finalTitle: '嗚嗚好吧 🍂',
-    finalText: '那我們下次再約，你要記得欠我一次。',
+  success: {
+    title: '🎉 耶！約成功了！',
+    text: '那就說定了，不見不散喔！',
+    emoji: '🎉',
   },
   notify: {
     enabled: true,

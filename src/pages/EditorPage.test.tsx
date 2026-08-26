@@ -36,7 +36,7 @@ describe('EditorPage — layout', () => {
   it('renders editor-root with all six section headings visible', () => {
     render(<EditorPage />);
     expect(screen.getByTestId('editor-root')).toBeInTheDocument();
-    for (const heading of ['主題', '開場頁', '提問頁', '整人手法', '不同意流程', '通知']) {
+    for (const heading of ['主題', '開場頁', '提問頁', '不同意整人手法', '成功頁', '通知']) {
       expect(screen.getByRole('heading', { name: new RegExp(heading) })).toBeInTheDocument();
     }
   });
@@ -47,6 +47,16 @@ describe('EditorPage — layout', () => {
     const preview = screen.getByTestId('preview-invite-root');
     await user.type(screen.getByLabelText('開場標題'), 'abc');
     expect(within(preview).getByTestId('intro-title')).toHaveTextContent('有一件事想跟你說abc');
+  });
+
+  it('typing 成功標題 reaches the preview success screen after 同意', async () => {
+    const user = userEvent.setup();
+    render(<EditorPage />);
+    const preview = screen.getByTestId('preview-invite-root');
+    await user.type(screen.getByLabelText('成功標題'), '自訂成功囉');
+    await user.click(within(preview).getByTestId('intro-cta'));
+    await user.click(within(preview).getByTestId('btn-agree'));
+    expect(within(preview).getByTestId('success-title')).toHaveTextContent('自訂成功囉');
   });
 
   it('clicking a preset swaps the accent color input and preview CSS var', async () => {
@@ -190,6 +200,8 @@ describe('EditorPage — persistence', () => {
     await user.click(within(modal).getByRole('button', { name: '確定' }));
     expect(screen.queryByTestId('reset-modal')).toBeNull();
     expect(screen.getByLabelText('開場標題')).toHaveValue(DEFAULT_CONFIG.intro.title);
+    // Reset restores the DEFAULT success section too.
+    expect(screen.getByLabelText('成功標題')).toHaveValue(DEFAULT_CONFIG.success.title);
     expect(localStorage.getItem('invite-draft')).toBeNull();
   });
 });

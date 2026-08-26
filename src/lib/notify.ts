@@ -12,19 +12,19 @@ const THROTTLE_MS = 60_000;
 const TITLE = '來約我嘛';
 
 const TAG_OPENED = 'mailbox_with_mail';
-const TAG_AGREE = 'warning';
-const TAG_GAVE_UP = 'white_flag';
+const TAG_DISAGREE = 'warning';
+const TAG_TADA = 'tada';
 
 const MSG_OPENED = '朋友打開了你的邀請 📩';
-const gaveUpMessage = (step: number): string => `朋友按了「不同意」（第 ${step} 步）🏳️`;
+const MSG_AGREED = '朋友同意了！🎉';
 
 export interface Notifier {
   /** Friend opened the invite page. */
   opened(): void;
-  /** One tap on 同意 (aggregated while throttled). */
-  agreeAttempt(): void;
-  /** Friend entered disagree step k (1-based). */
-  gaveUp(step: number): void;
+  /** One tap on 不同意 (aggregated while throttled). */
+  disagreeAttempt(): void;
+  /** Friend pressed 同意 — the payoff event; always sends, never throttled. */
+  agreed(): void;
 }
 
 export interface NotifierOptions {
@@ -34,8 +34,8 @@ export interface NotifierOptions {
 
 const NOOP_NOTIFIER: Notifier = {
   opened: () => {},
-  agreeAttempt: () => {},
-  gaveUp: () => {},
+  disagreeAttempt: () => {},
+  agreed: () => {},
 };
 
 /**
@@ -66,9 +66,8 @@ export function createNotifier(topic: string | null, opts?: NotifierOptions): No
   };
 
   let openedSentAt: number | null = null;
-  let gaveUpSentAt: number | null = null;
-  let agreeWindowStartedAt: number | null = null;
-  let agreePendingCount = 0;
+  let disagreeWindowStartedAt: number | null = null;
+  let disagreePendingCount = 0;
 
   return {
     opened(): void {
@@ -78,26 +77,24 @@ export function createNotifier(topic: string | null, opts?: NotifierOptions): No
       publish(TAG_OPENED, MSG_OPENED);
     },
 
-    agreeAttempt(): void {
+    disagreeAttempt(): void {
       const ts = now();
-      if (isThrottled(agreeWindowStartedAt, ts)) {
-        agreePendingCount += 1; // silent accumulation inside the window
+      if (isThrottled(disagreeWindowStartedAt, ts)) {
+        disagreePendingCount += 1; // silent accumulation inside the window
         return;
       }
-      const total = agreePendingCount + 1;
-      agreePendingCount = 0;
-      agreeWindowStartedAt = ts;
+      const total = disagreePendingCount + 1;
+      disagreePendingCount = 0;
+      disagreeWindowStartedAt = ts;
       publish(
-        TAG_AGREE,
-        total === 1 ? '朋友按了第 1 次同意' : `朋友已累積嘗試 ${total} 次同意`,
+        TAG_DISAGREE,
+        total === 1 ? '朋友按了第 1 次不同意' : `朋友已累積嘗試 ${total} 次不同意`,
       );
     },
 
-    gaveUp(step: number): void {
-      const ts = now();
-      if (isThrottled(gaveUpSentAt, ts)) return;
-      gaveUpSentAt = ts;
-      publish(TAG_GAVE_UP, gaveUpMessage(step));
+    agreed(): void {
+      // Payoff event: no throttle bucket — every 同意 press is worth knowing.
+      publish(TAG_TADA, MSG_AGREED);
     },
   };
 }

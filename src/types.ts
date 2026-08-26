@@ -67,7 +67,7 @@ export interface MilestonesCfg {
 }
 
 export interface GagConfig {
-  /** applied in order, cycling forever; agree NEVER succeeds */
+  /** applied in order, cycling forever; 不同意 NEVER succeeds */
   modes: GagModeId[];
   dodge: DodgeCfg;
   errors: FakeErrorsCfg;
@@ -77,17 +77,13 @@ export interface GagConfig {
   milestones: MilestonesCfg;
 }
 
-export interface DisagreeStep {
+export interface SuccessConfig {
+  /** celebration headline shown when the friend presses 同意 */
+  title: string;
+  /** celebration body copy */
   text: string;
-  buttonLabel: string;
-}
-
-export interface DisagreeFlowConfig {
-  steps: DisagreeStep[];
-  /** when true, last step wraps back to the first instead of reaching final */
-  loop: boolean;
-  finalTitle: string;
-  finalText: string;
+  /** big bouncing celebration emoji */
+  emoji: string;
 }
 
 export interface NotifyConfig {
@@ -97,11 +93,11 @@ export interface NotifyConfig {
 }
 
 export interface InviteConfig {
-  v: 1;
+  v: 2;
   theme: ThemeConfig;
   intro: IntroConfig;
   question: QuestionConfig;
   gag: GagConfig;
-  disagreeFlow: DisagreeFlowConfig;
+  success: SuccessConfig;
   notify: NotifyConfig;
 }

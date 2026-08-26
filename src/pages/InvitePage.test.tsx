@@ -27,7 +27,7 @@ describe('InvitePage — decode success', () => {
     expect(screen.getByTestId('intro-title')).toHaveTextContent(DEFAULT_CONFIG.intro.title);
   });
 
-  it('fires notifier.opened once on mount and agreeAttempt flows through on press', async () => {
+  it('fires notifier.opened once on mount and agreed flows through on 同意 press', async () => {
     const fetchMock = vi.fn(
       async (_url: RequestInfo | URL, _init?: RequestInit) => ({ catch: () => undefined }),
     );
@@ -50,7 +50,7 @@ describe('InvitePage — decode success', () => {
     await user.click(screen.getByTestId('intro-cta'));
     await user.click(screen.getByTestId('btn-agree'));
 
-    // First agreeAttempt is published immediately (throttle window starts empty).
+    // agreed() is the payoff event: published immediately, never throttled.
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

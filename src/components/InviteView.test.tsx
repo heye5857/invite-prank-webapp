@@ -23,8 +23,8 @@ function gagCfg(gag: Partial<GagConfig>): Partial<InviteConfig> {
 function makeSpy() {
   return {
     opened: vi.fn(),
-    agreeAttempt: vi.fn(),
-    gaveUp: vi.fn(),
+    disagreeAttempt: vi.fn(),
+    agreed: vi.fn(),
   } satisfies Notifier;
 }
 
@@ -60,28 +60,61 @@ describe('InviteView — S1 flow', () => {
   });
 });
 
-describe('InviteView — fakeErrors mode', () => {
+describe('InviteView — success screen (同意 payoff)', () => {
+  it('agree press goes straight to the celebration screen with the DEFAULT success copy', async () => {
+    const user = userEvent.setup();
+    const spy = makeSpy();
+    render(<InviteView config={makeConfig({})} notifier={spy} />);
+    await user.click(screen.getByTestId('intro-cta'));
+
+    await user.click(screen.getByTestId('btn-agree'));
+
+    expect(screen.getByTestId('success-title')).toHaveTextContent(DEFAULT_CONFIG.success.title);
+    expect(screen.getByTestId('success-text')).toHaveTextContent(DEFAULT_CONFIG.success.text);
+    expect(screen.getByTestId('success-emoji')).toHaveTextContent(DEFAULT_CONFIG.success.emoji);
+    expect(spy.agreed).toHaveBeenCalledTimes(1);
+    // The prank button is gone with the question screen: refusal is impossible.
+    expect(screen.queryByTestId('btn-disagree')).not.toBeInTheDocument();
+  });
+
+  it('renders custom success fields from the config', async () => {
+    const user = userEvent.setup();
+    const cfg = makeConfig({
+      success: { title: '自訂成功標題', text: '自訂成功內文', emoji: '🥳' },
+    });
+    render(<InviteView config={cfg} />);
+    await user.click(screen.getByTestId('intro-cta'));
+
+    await user.click(screen.getByTestId('btn-agree'));
+
+    expect(screen.getByTestId('success-title')).toHaveTextContent('自訂成功標題');
+    expect(screen.getByTestId('success-text')).toHaveTextContent('自訂成功內文');
+    expect(screen.getByTestId('success-emoji')).toHaveTextContent('🥳');
+  });
+});
+
+describe('InviteView — fakeErrors mode (不同意 press)', () => {
   it('shows the first toast message on press and the second on the next press', async () => {
     const user = userEvent.setup();
     const cfg = makeConfig(gagCfg({ modes: ['fakeErrors'], errors: { messages: ['錯誤一號', '錯誤二號'] } }));
     await gotoQuestion(user, cfg);
 
-    await user.click(screen.getByTestId('btn-agree'));
+    await user.click(screen.getByTestId('btn-disagree'));
     expect(screen.getByTestId('gag-overlay-toast')).toHaveTextContent('錯誤一號');
 
-    await user.click(screen.getByTestId('btn-agree'));
+    await user.click(screen.getByTestId('btn-disagree'));
     expect(screen.getByTestId('gag-overlay-toast')).toHaveTextContent('錯誤二號');
   });
 });
 
-describe('InviteView — fakeLoad mode', () => {
+describe('InviteView — fakeLoad mode (不同意 press)', () => {
   // fireEvent (sync) here: user-event's internal waits fight vitest fake timers.
   it('shows the loading spinner, then the fail toast once delayMs elapses', () => {
     vi.useFakeTimers();
     const cfg = makeConfig(gagCfg({ modes: ['fakeLoad'], fakeLoad: { delayMs: 1000, failText: '提交失敗啦' } }));
     render(<InviteView config={cfg} />);
     fireEvent.click(screen.getByTestId('intro-cta'));
-    fireEvent.click(screen.getByTestId('btn-agree'));
+    fireEvent.click(screen.getByTestId('btn-disagree'));
     expect(screen.getByTestId('gag-overlay-loading')).toBeInTheDocument();
 
     act(() => {
@@ -93,26 +126,28 @@ describe('InviteView — fakeLoad mode', () => {
   });
 });
 
-describe('InviteView — dodge mode', () => {
-  it('changes the agree button transform on press (deterministic rand)', async () => {
+describe('InviteView — dodge mode (不同意 press)', () => {
+  it('changes the disagree button transform on press (deterministic rand)', async () => {
     // draw()=0.75 → x=(2*0.75-1)*120=60px, y=(2*0.75-1)*60=30px
     vi.spyOn(Math, 'random').mockReturnValue(0.75);
     const user = userEvent.setup();
     const cfg = makeConfig({ gag: { ...DEFAULT_CONFIG.gag, modes: ['dodge'] } });
     await gotoQuestion(user, cfg);
 
-    const agree = screen.getByTestId('btn-agree');
-    const before = agree.style.transform;
-    await user.click(agree);
-    const after = agree.style.transform;
+    const disagree = screen.getByTestId('btn-disagree');
+    const before = disagree.style.transform;
+    await user.click(disagree);
+    const after = disagree.style.transform;
 
     expect(after).not.toBe(before);
     expect(after).toContain('translate(60px, 30px)');
+    // The escape hatch never moves: 同意 stays exactly where it was.
+    expect(screen.getByTestId('btn-agree').style.transform).toBe('scale(1)');
   });
 });
 
-describe('InviteView — shrink mode', () => {
-  it('shrinks the agree button and enlarges the disagree button per press', async () => {
+describe('InviteView — shrink mode (不同意 press)', () => {
+  it('shrinks the disagree button and enlarges the agree button per press', async () => {
     const user = userEvent.setup();
     const cfg = makeConfig({
       gag: { ...DEFAULT_CONFIG.gag, modes: ['shrink'], shrink: { minScale: 0.35 } },
@@ -122,27 +157,27 @@ describe('InviteView — shrink mode', () => {
     const agree = screen.getByTestId('btn-agree');
     const disagree = screen.getByTestId('btn-disagree');
 
-    await user.click(agree);
-    expect(agree.style.transform).toContain('scale(0.85)');
-    expect(disagree.style.transform).toContain('scale(1.12)');
+    await user.click(disagree);
+    expect(disagree.style.transform).toContain('scale(0.85)');
+    expect(agree.style.transform).toContain('scale(1.12)');
 
-    await user.click(agree);
-    const agreeMatch = /scale\(([\d.]+)\)/.exec(agree.style.transform);
+    await user.click(disagree);
     const disagreeMatch = /scale\(([\d.]+)\)/.exec(disagree.style.transform);
-    expect(agreeMatch).not.toBeNull();
+    const agreeMatch = /scale\(([\d.]+)\)/.exec(agree.style.transform);
     expect(disagreeMatch).not.toBeNull();
-    expect(Number(agreeMatch?.[1])).toBeLessThan(0.85);
-    expect(Number(disagreeMatch?.[1])).toBeGreaterThan(1.12);
+    expect(agreeMatch).not.toBeNull();
+    expect(Number(disagreeMatch?.[1])).toBeLessThan(0.85);
+    expect(Number(agreeMatch?.[1])).toBeGreaterThan(1.12);
   });
 });
 
-describe('InviteView — confirmLoop mode', () => {
+describe('InviteView — confirmLoop mode (不同意 press)', () => {
   it('shows a confirm modal with the prompt; clicking 確定 closes it', async () => {
     const user = userEvent.setup();
     const cfg = makeConfig(gagCfg({ modes: ['confirmLoop'], confirmLoop: { prompts: ['你確定嗎？'] } }));
     await gotoQuestion(user, cfg);
 
-    await user.click(screen.getByTestId('btn-agree'));
+    await user.click(screen.getByTestId('btn-disagree'));
     const modal = screen.getByTestId('gag-modal-confirm');
     expect(modal).toHaveTextContent('你確定嗎？');
 
@@ -151,75 +186,14 @@ describe('InviteView — confirmLoop mode', () => {
   });
 });
 
-describe('InviteView — disagree flow', () => {
-  it('walks steps in order and reaches the final screen past the last step', async () => {
-    const user = userEvent.setup();
-    const spy = makeSpy();
-    const cfg = makeConfig({
-      disagreeFlow: {
-        steps: [
-          { text: '步驟零', buttonLabel: '下一步零' },
-          { text: '步驟一', buttonLabel: '下一步一' },
-          { text: '步驟二', buttonLabel: '下一步二' },
-        ],
-        loop: false,
-        finalTitle: '結束標題',
-        finalText: '結束內文',
-      },
-    });
-    render(<InviteView config={cfg} notifier={spy} />);
-    await user.click(screen.getByTestId('intro-cta'));
-
-    await user.click(screen.getByTestId('btn-disagree'));
-    expect(screen.getByTestId('disagree-step-text')).toHaveTextContent('步驟零');
-    expect(spy.gaveUp).toHaveBeenNthCalledWith(1, 1);
-
-    await user.click(screen.getByTestId('disagree-next-btn'));
-    expect(screen.getByTestId('disagree-step-text')).toHaveTextContent('步驟一');
-    expect(spy.gaveUp).toHaveBeenNthCalledWith(2, 2);
-
-    await user.click(screen.getByTestId('disagree-next-btn'));
-    expect(screen.getByTestId('disagree-step-text')).toHaveTextContent('步驟二');
-
-    await user.click(screen.getByTestId('disagree-next-btn'));
-    expect(screen.getByTestId('final-title')).toHaveTextContent('結束標題');
-    expect(screen.getByText('結束內文')).toBeInTheDocument();
-  });
-
-  it('wraps back to the first step when loop is true', async () => {
-    const user = userEvent.setup();
-    const cfg = makeConfig({
-      disagreeFlow: {
-        steps: [
-          { text: '循環甲', buttonLabel: '繼續甲' },
-          { text: '循環乙', buttonLabel: '繼續乙' },
-        ],
-        loop: true,
-        finalTitle: '不會到這',
-        finalText: '',
-      },
-    });
-    render(<InviteView config={cfg} />);
-    await user.click(screen.getByTestId('intro-cta'));
-
-    await user.click(screen.getByTestId('btn-disagree'));
-    await user.click(screen.getByTestId('disagree-next-btn'));
-    expect(screen.getByTestId('disagree-step-text')).toHaveTextContent('循環乙');
-
-    await user.click(screen.getByTestId('disagree-next-btn'));
-    expect(screen.queryByTestId('final-title')).not.toBeInTheDocument();
-    expect(screen.getByTestId('disagree-step-text')).toHaveTextContent('循環甲');
-  });
-});
-
-describe('InviteView — milestone banner', () => {
+describe('InviteView — milestone banner (不同意 press)', () => {
   it('appears when everyN=1 right after the first press', async () => {
     const user = userEvent.setup();
     const cfg = makeConfig(gagCfg({ modes: ['fakeErrors'], milestones: { everyN: 1, messages: ['M'] } }));
     await gotoQuestion(user, cfg);
 
     expect(screen.queryByTestId('milestone-banner')).not.toBeInTheDocument();
-    await user.click(screen.getByTestId('btn-agree'));
+    await user.click(screen.getByTestId('btn-disagree'));
     expect(screen.getByTestId('milestone-banner')).toHaveTextContent('M');
   });
 
@@ -228,19 +202,19 @@ describe('InviteView — milestone banner', () => {
     const cfg = makeConfig(gagCfg({ modes: ['fakeErrors'], milestones: { everyN: 2, messages: ['里程碑'] } }));
     await gotoQuestion(user, cfg);
 
-    await user.click(screen.getByTestId('btn-agree'));
+    await user.click(screen.getByTestId('btn-disagree'));
     expect(screen.queryByTestId('milestone-banner')).not.toBeInTheDocument();
 
-    await user.click(screen.getByTestId('btn-agree'));
+    await user.click(screen.getByTestId('btn-disagree'));
     expect(screen.getByTestId('milestone-banner')).toHaveTextContent('里程碑');
 
-    await user.click(screen.getByTestId('btn-agree'));
+    await user.click(screen.getByTestId('btn-disagree'));
     expect(screen.queryByTestId('milestone-banner')).not.toBeInTheDocument();
   });
 });
 
 describe('InviteView — notifier wiring', () => {
-  it('never calls opened itself; fires agreeAttempt exactly once per agree press', async () => {
+  it('never calls opened itself; fires disagreeAttempt per 不同意 press and agreed exactly once on 同意', async () => {
     const user = userEvent.setup();
     const spy = makeSpy();
     render(<InviteView config={makeConfig({})} notifier={spy} />);
@@ -248,10 +222,13 @@ describe('InviteView — notifier wiring', () => {
     expect(spy.opened).not.toHaveBeenCalled();
 
     await user.click(screen.getByTestId('intro-cta'));
-    await user.click(screen.getByTestId('btn-agree'));
+    await user.click(screen.getByTestId('btn-disagree'));
+    await user.click(screen.getByTestId('btn-disagree'));
+    expect(spy.disagreeAttempt).toHaveBeenCalledTimes(2);
+    expect(spy.agreed).not.toHaveBeenCalled();
 
-    expect(spy.agreeAttempt).toHaveBeenCalledTimes(1);
-    expect(spy.gaveUp).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId('btn-agree'));
+    expect(spy.agreed).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -298,9 +275,9 @@ describe('InviteView — gag state reset on config change', () => {
     await user.click(screen.getByTestId('intro-cta'));
 
     // Press 1 → fakeErrors toast; press 2 → falls through to fakeLoad (loading).
-    await user.click(screen.getByTestId('btn-agree'));
+    await user.click(screen.getByTestId('btn-disagree'));
     expect(screen.getByTestId('gag-overlay-toast')).toBeInTheDocument();
-    await user.click(screen.getByTestId('btn-agree'));
+    await user.click(screen.getByTestId('btn-disagree'));
     expect(screen.getByTestId('gag-overlay-loading')).toBeInTheDocument();
 
     // Swap to a single-mode config: stale modeIdx (1) would point OUTSIDE the
@@ -316,9 +293,8 @@ describe('InviteView — gag state reset on config change', () => {
     };
     rerender(<InviteView config={cfgB} />);
 
-    await user.click(screen.getByTestId('btn-agree'));
+    await user.click(screen.getByTestId('btn-disagree'));
     expect(screen.getByTestId('gag-modal-confirm')).toBeInTheDocument();
     expect(screen.getByTestId('gag-modal-confirm')).toHaveTextContent('你確定嗎？');
   });
 });
-

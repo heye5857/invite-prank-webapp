@@ -18,7 +18,7 @@ function makeCfg(patch: Partial<GagConfig> = {}): GagConfig {
 }
 
 function press(state: GagState, cfg: GagConfig, rand?: () => number): GagState {
-  return reduceGag(state, rand ? { type: 'AGREE_PRESS', rand } : { type: 'AGREE_PRESS' }, cfg);
+  return reduceGag(state, rand ? { type: 'PRANK_PRESS', rand } : { type: 'PRANK_PRESS' }, cfg);
 }
 
 function presses(state: GagState, cfg: GagConfig, n: number, rand?: () => number): GagState {
@@ -51,8 +51,8 @@ describe('createInitialGagState', () => {
       attempt: 0,
       modeIdx: 0,
       stepInMode: 0,
-      scaleAgree: 1,
-      scaleDisagree: 1,
+      scalePrank: 1,
+      scaleEscape: 1,
       offset: { x: 0, y: 0 },
       overlay: null,
       milestoneMessage: null,
@@ -236,32 +236,32 @@ describe('dismiss', () => {
 describe('shrink', () => {
   const cfg = makeCfg({ modes: ['shrink'] });
 
-  it('decreases scaleAgree monotonically, never below minScale, never NaN over 30 presses', () => {
+  it('decreases scalePrank monotonically, never below minScale, never NaN over 30 presses', () => {
     let state = createInitialGagState();
     for (let i = 0; i < 30; i += 1) {
-      const prev = state.scaleAgree;
+      const prev = state.scalePrank;
       state = press(state, cfg);
-      expect(state.scaleAgree).toBeLessThanOrEqual(prev);
-      expect(state.scaleAgree).toBeGreaterThanOrEqual(0.35);
-      expect(Number.isFinite(state.scaleAgree)).toBe(true);
+      expect(state.scalePrank).toBeLessThanOrEqual(prev);
+      expect(state.scalePrank).toBeGreaterThanOrEqual(0.35);
+      expect(Number.isFinite(state.scalePrank)).toBe(true);
     }
   });
 
   it('converges exactly at minScale', () => {
     const final = presses(createInitialGagState(), cfg, 30);
-    expect(final.scaleAgree).toBe(0.35);
+    expect(final.scalePrank).toBe(0.35);
   });
 
-  it('grows scaleDisagree monotonically and caps it at exactly 1.6', () => {
+  it('grows scaleEscape monotonically and caps it at exactly 1.6', () => {
     let state = createInitialGagState();
     for (let i = 0; i < 30; i += 1) {
-      const prev = state.scaleDisagree;
+      const prev = state.scaleEscape;
       state = press(state, cfg);
-      expect(state.scaleDisagree).toBeGreaterThanOrEqual(prev);
-      expect(state.scaleDisagree).toBeLessThanOrEqual(1.6);
-      expect(Number.isFinite(state.scaleDisagree)).toBe(true);
+      expect(state.scaleEscape).toBeGreaterThanOrEqual(prev);
+      expect(state.scaleEscape).toBeLessThanOrEqual(1.6);
+      expect(Number.isFinite(state.scaleEscape)).toBe(true);
     }
-    expect(state.scaleDisagree).toBe(1.6);
+    expect(state.scaleEscape).toBe(1.6);
   });
 
   it('sets no overlay', () => {
@@ -346,8 +346,8 @@ describe('cross-cutting', () => {
       attempt: 1,
       modeIdx: 0,
       stepInMode: 0,
-      scaleAgree: 1,
-      scaleDisagree: 1,
+      scalePrank: 1,
+      scaleEscape: 1,
       offset: { x: 0, y: 0 },
       overlay: null,
       milestoneMessage: null,
@@ -371,3 +371,4 @@ describe('cross-cutting', () => {
     expect(next.offset).toEqual({ x: 0, y: 0 }); // rand 0.5 maps to the center
   });
 });
+
