@@ -282,3 +282,43 @@ describe('InviteView — theming', () => {
     expect(screen.getByText('🍀')).toBeInTheDocument();
   });
 });
+
+describe('InviteView — gag state reset on config change', () => {
+  it('applies a NEW gag config from press #1 instead of continuing stale engine state', async () => {
+    const user = userEvent.setup();
+    const cfgA: InviteConfig = {
+      ...DEFAULT_CONFIG,
+      gag: {
+        ...DEFAULT_CONFIG.gag,
+        modes: ['fakeErrors', 'fakeLoad'],
+        dodge: { times: 1 },
+      },
+    };
+    const { rerender } = render(<InviteView config={cfgA} />);
+    await user.click(screen.getByTestId('intro-cta'));
+
+    // Press 1 → fakeErrors toast; press 2 → falls through to fakeLoad (loading).
+    await user.click(screen.getByTestId('btn-agree'));
+    expect(screen.getByTestId('gag-overlay-toast')).toBeInTheDocument();
+    await user.click(screen.getByTestId('btn-agree'));
+    expect(screen.getByTestId('gag-overlay-loading')).toBeInTheDocument();
+
+    // Swap to a single-mode config: stale modeIdx (1) would point OUTSIDE the
+    // new array and presses would silently no-op. The reset makes press #1 of
+    // the new config show its first effect immediately.
+    const cfgB: InviteConfig = {
+      ...DEFAULT_CONFIG,
+      gag: {
+        ...DEFAULT_CONFIG.gag,
+        modes: ['confirmLoop'],
+        dodge: { times: 1 },
+      },
+    };
+    rerender(<InviteView config={cfgB} />);
+
+    await user.click(screen.getByTestId('btn-agree'));
+    expect(screen.getByTestId('gag-modal-confirm')).toBeInTheDocument();
+    expect(screen.getByTestId('gag-modal-confirm')).toHaveTextContent('你確定嗎？');
+  });
+});
+

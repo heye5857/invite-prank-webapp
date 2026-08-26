@@ -46,6 +46,14 @@ export function InviteView({ config, notifier, rootTestId = 'invite-root' }: Inv
   const [gag, setGag] = useState<GagState>(createInitialGagState);
   const [disagreeStep, setDisagreeStep] = useState(0);
 
+  // A new gag configuration is a NEW simulation: reset the engine state so the
+  // editor preview always reflects the current modes from press #1. Without
+  // this, a stale modeIdx can point outside the new modes array and presses
+  // silently no-op (engine guards out-of-range indices by returning state).
+  useEffect(() => {
+    setGag(createInitialGagState());
+  }, [config.gag]);
+
   // Loading overlay auto-dismisses after delayMs; the engine turns it into a
   // toast carrying cfg.fakeLoad.failText. Cleanup covers unmount + state change.
   const dismiss = () => setGag((prev) => reduceGag(prev, { type: 'DISMISS' }, config.gag));

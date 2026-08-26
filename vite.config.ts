@@ -1,9 +1,22 @@
 /// <reference types="vitest" />
+import { execSync } from 'node:child_process';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// Embedded in the editor footer so anyone can tell WHICH deploy they run.
+const GIT_HASH = (() => {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim();
+  } catch {
+    return 'dev';
+  }
+})();
+
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(GIT_HASH),
+  },
   // Relative base: hash routing means assets resolve correctly both in dev,
   // on GitHub Pages project subpath (/repo-name/), and on Netlify/Vercel drops.
   base: './',

@@ -809,6 +809,10 @@ export default function EditorPage() {
           </div>
         </div>
       )}
+
+      <footer className="pb-4 pt-2 text-center text-xs text-neutral-400">
+        來約我嘛 build {__APP_VERSION__}
+      </footer>
     </main>
   );
 }
