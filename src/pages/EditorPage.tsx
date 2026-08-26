@@ -7,7 +7,7 @@
  * ntfy-subscribe URLs.
  */
 // allow: SIZE_OK — T7 contract mandates this exact file set; extraction into more files is out of scope.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
 
 import { InviteView } from '../components/InviteView';
@@ -120,7 +120,7 @@ function Card({ icon, title, children }: { icon: string; title: string; children
 
 export default function EditorPage() {
   const [draft, setDraft] = useState<InviteConfig>(loadDraft);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [linkRevealed, setLinkRevealed] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
 
   // ---- autosave (300ms debounce; cleanup cancels on every draft change) ----
@@ -174,8 +174,15 @@ export default function EditorPage() {
 
   const numFrom = (e: ChangeEvent<HTMLInputElement>): number => e.target.valueAsNumber;
 
-  const generateLink = () =>
-    setShareUrl(buildShareUrl(window.location.origin + window.location.pathname, draft));
+  // The share link auto-refreshes with the draft: once revealed, it can never
+  // go stale — editing settings always updates the link + QR before copying.
+  const shareUrl = useMemo(
+    () =>
+      linkRevealed
+        ? buildShareUrl(window.location.origin + window.location.pathname, draft)
+        : null,
+    [linkRevealed, draft],
+  );
 
   const copyLink = async () => {
     if (shareUrl === null) return;
@@ -189,7 +196,7 @@ export default function EditorPage() {
   const confirmReset = () => {
     localStorage.removeItem(DRAFT_KEY);
     setDraft(clone(DEFAULT_CONFIG));
-    setShareUrl(null);
+    setLinkRevealed(false);
     setShowResetModal(false);
   };
 
@@ -655,11 +662,14 @@ export default function EditorPage() {
             <button
               type="button"
               data-testid="generate-link-btn"
-              onClick={generateLink}
+              onClick={() => setLinkRevealed(true)}
               className="rounded-xl bg-violet-600 px-5 py-3 font-bold text-white shadow-md transition hover:bg-violet-700 active:scale-95"
             >
               產生邀請連結
             </button>
+            <p className="text-xs text-neutral-500">
+              連結會隨著設定自動更新——改完內容直接重新複製就好 📋
+            </p>
             {shareUrl !== null && (
               <div className="space-y-3">
                 {shareUrl.length > 6000 && (

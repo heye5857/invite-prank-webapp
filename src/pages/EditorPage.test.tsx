@@ -214,3 +214,25 @@ describe('EditorPage — notifications', () => {
     );
   });
 });
+
+describe('EditorPage — share link auto-refresh', () => {
+  it('regenerates the link when settings change after the first reveal (never stale)', async () => {
+    const user = userEvent.setup();
+    render(<EditorPage />);
+
+    // Reveal once.
+    await user.click(screen.getByTestId('generate-link-btn'));
+    const first = screen.getByTestId<HTMLInputElement>('share-link-output').value;
+    expect(decodeConfig(payloadOf(first)).ok).toBe(true);
+
+    // Change a setting WITHOUT clicking generate again.
+    await user.type(screen.getByLabelText('開場標題'), '自動更新');
+    const second = screen.getByTestId<HTMLInputElement>('share-link-output').value;
+    expect(second).not.toBe(first);
+
+    // The fresh link carries the new title.
+    const decoded = decodeConfig(payloadOf(second));
+    if (!decoded.ok) throw new Error(`decode failed: ${decoded.error}`);
+    expect(decoded.config.intro.title).toBe(`${DEFAULT_CONFIG.intro.title}自動更新`);
+  });
+});
